@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: tphudz-key-bot
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
+    envVars:
+      - key: BOT_TOKEN
+        value: 8976870037:AAGuBLfCx8VSTms00hCUECNfQ2yjN0_GqBg
+      - key: PYTHON_VERSION
+        value: "3.11.0"
