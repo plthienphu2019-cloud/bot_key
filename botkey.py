@@ -1,5 +1,5 @@
 # ============================================
-# TPHUDZ KEY BOT — RENDER READY (Webhook Mode)
+# TPHUDZ KEY BOT — botkey.py (RENDER WEBHOOK)
 # ============================================
 import logging
 import sqlite3
@@ -37,13 +37,10 @@ ADMINS = {
     "minhlam900": {"password": "minhlam900$", "role": "sub",   "name": "Admin Phụ"},
 }
 
-# ============================================
-# KEY TYPES
-# ============================================
 KEY_TYPES = {
-    "bac":    {"name": "Key Bạc",   "prefix": "TPTOOL_VIP1",           "role": "VIP1"},
-    "vang":   {"name": "Key Vàng",  "prefix": "TPTOOL_VIP3",           "role": "VIP3"},
-    "super":  {"name": "Key Super", "prefix": "TPTOOL_VIP_PRENIUM",    "role": "PREMIUM"},
+    "bac":   {"name": "Key Bạc",   "prefix": "TPTOOL_VIP1"},
+    "vang":  {"name": "Key Vàng",  "prefix": "TPTOOL_VIP3"},
+    "super": {"name": "Key Super", "prefix": "TPTOOL_VIP_PRENIUM"},
 }
 
 DURATIONS = {
@@ -176,16 +173,12 @@ def _rand_upper(n):
     return "".join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(n))
 
 
-def gen_key(key_type: str) -> str:
-    """Sinh key theo đúng format yêu cầu"""
+def gen_key(key_type):
     if key_type == "bac":
-        # TPTOOL_VIP1_XXXXX_XXXXX_XXXX
         return f"TPTOOL_VIP1_{_rand_upper(5)}_{_rand_upper(5)}_{_rand_upper(4)}"
     elif key_type == "vang":
-        # TPTOOL_VIP3_XXXX_XXXXXX_XXXX
         return f"TPTOOL_VIP3_{_rand_upper(4)}_{_rand_upper(6)}_{_rand_upper(4)}"
     elif key_type == "super":
-        # TPTOOL_VIP_PRENIUM_XXX_XXXX_XXX_XXX_XXXX
         return (f"TPTOOL_VIP_PRENIUM_{_rand_upper(3)}_{_rand_upper(4)}_"
                 f"{_rand_upper(3)}_{_rand_upper(3)}_{_rand_upper(4)}")
     return f"TPTOOL_UNKNOWN_{_rand_upper(8)}"
@@ -217,14 +210,10 @@ def main_menu(role):
 
 
 def back_only_kb():
-    return ReplyKeyboardMarkup(
-        [[KeyboardButton("⬅️ Quay lại menu")]],
-        resize_keyboard=True
-    )
+    return ReplyKeyboardMarkup([[KeyboardButton("⬅️ Quay lại menu")]], resize_keyboard=True)
 
 
 def key_type_kb():
-    """Menu chọn loại key"""
     return ReplyKeyboardMarkup([
         [KeyboardButton("🥈 Key bạc")],
         [KeyboardButton("🥇 Key vàng")],
@@ -234,7 +223,6 @@ def key_type_kb():
 
 
 def duration_kb():
-    """Menu chọn thời hạn"""
     return ReplyKeyboardMarkup([
         [KeyboardButton("⏱ 1 ngày 24h")],
         [KeyboardButton("⏱ 3 ngày 72h")],
@@ -254,7 +242,6 @@ async def _cleanup_msgs(ctx, uid):
 
 
 async def send_auto_delete(msg, delay=40):
-    """Tự động xoá tin nhắn sau `delay` giây"""
     async def _del():
         await asyncio.sleep(delay)
         try:
@@ -326,9 +313,6 @@ async def cmd_cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("❌ Đã hủy.")
 
 
-# ============================================
-# MENU HANDLER
-# ============================================
 async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     uid = update.effective_user.id
@@ -339,14 +323,14 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     role = user["admin_role"]
 
-    # ===== QUAY LẠI MENU =====
+    # Quay lại menu
     if text == "⬅️ Quay lại menu":
         WAITING.pop(uid, None)
         await _cleanup_msgs(ctx, uid)
         await update.message.reply_text("📋 Menu chính:", reply_markup=main_menu(role))
         return
 
-    # ===== LẤY KEY VIP =====
+    # Lấy key VIP
     if text in ("🔑 Lấy key VIP", "🔑 Lấy key VIP (chờ duyệt)"):
         WAITING[uid] = "choose_type"
         prompt = await update.message.reply_text(
@@ -361,7 +345,7 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         WAITING[f"del_{uid}"] = [update.message.message_id, prompt.message_id]
         return
 
-    # ===== CHỌN LOẠI KEY =====
+    # Chọn loại key
     if uid in WAITING and WAITING[uid] == "choose_type":
         if text == "🥈 Key bạc":
             WAITING[uid] = {"type": "bac", "stage": "duration"}
@@ -373,9 +357,7 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❓ Chọn 1 trong 3 loại key.")
             return
 
-        # Xoá prompt cũ
         await _cleanup_msgs(ctx, uid)
-
         prompt = await update.message.reply_text(
             f"⏱ *CHỌN THỜI HẠN* — {KEY_TYPES[WAITING[uid]['type']]['name']}\n\n"
             "• 1 ngày → 24h\n"
@@ -389,7 +371,7 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         WAITING[f"del_{uid}"] = [update.message.message_id, prompt.message_id]
         return
 
-    # ===== CHỌN THỜI HẠN =====
+    # Chọn thời hạn
     if uid in WAITING and isinstance(WAITING[uid], dict) and WAITING[uid].get("stage") == "duration":
         dur_map = {
             "⏱ 1 ngày 24h":   "24h",
@@ -403,12 +385,9 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
         key_type = WAITING[uid]["type"]
         duration = dur_map[text]
-
-        # Sinh key
         key_value = gen_key(key_type)
         req_id = create_key_req(uid, user["admin_user"], key_value, key_type, duration)
 
-        # Xoá prompt
         await _cleanup_msgs(ctx, uid)
         try:
             await update.message.delete()
@@ -418,7 +397,6 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         info = KEY_TYPES[key_type]
         dur_info = DURATIONS[duration]
 
-        # Admin chính → duyệt luôn
         if role == "super":
             approve_key(req_id, user["admin_user"])
             msg = await update.message.reply_text(
@@ -435,8 +413,6 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 reply_markup=main_menu(role)
             )
             await send_auto_delete(msg, 40)
-
-        # Admin phụ → chờ duyệt
         else:
             msg = await update.message.reply_text(
                 f"⏳ *YÊU CẦU ĐÃ GỬI*\n"
@@ -452,7 +428,6 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             )
             await send_auto_delete(msg, 40)
 
-            # Gửi cho super admin
             with db() as c:
                 supers = c.execute("SELECT tg_id FROM users WHERE admin_role='super'").fetchall()
             kb = InlineKeyboardMarkup([[
@@ -464,9 +439,7 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                     await ctx.bot.send_message(
                         s["tg_id"],
                         f"🔔 *YÊU CẦU DUYỆT KEY*\n"
-                        f"━━━━━━━━━━━━━━━━━━\n"
                         f"👤 Admin phụ: `{user['admin_user']}`\n"
-                        f"🆔 Mã: `{user['code']}`\n"
                         f"🏷 Loại: *{info['name']}*\n"
                         f"⏱ Thời hạn: *{dur_info['name']}*\n"
                         f"🔑 `{key_value}`",
@@ -478,7 +451,7 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         WAITING.pop(uid, None)
         return
 
-    # ===== ĐỔI MẬT KHẨU =====
+    # Đổi mật khẩu
     if text == "🔐 Đổi mật khẩu":
         WAITING[uid] = "password"
         prompt = await update.message.reply_text(
@@ -489,7 +462,7 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         WAITING[f"del_{uid}"] = [update.message.message_id, prompt.message_id]
         return
 
-    # ===== THÊM KÊNH =====
+    # Thêm kênh
     if text == "📡 Thêm Kênh":
         if role != "super":
             await update.message.reply_text("⛔ Chỉ Admin Chính.", reply_markup=back_only_kb())
@@ -508,7 +481,7 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         WAITING[f"del_{uid}"] = [update.message.message_id, prompt.message_id]
         return
 
-    # ===== DUYỆT BILL =====
+    # Duyệt bill
     if text == "💳 Duyệt Bill":
         if role != "super":
             await update.message.reply_text("⛔ Chỉ Admin Chính.", reply_markup=back_only_kb())
@@ -529,7 +502,7 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⬅️ Quay lại menu", reply_markup=back_only_kb())
         return
 
-    # ===== HỒ SƠ =====
+    # Hồ sơ cá nhân
     if text == "👤 Hồ sơ cá nhân":
         role_name = "Admin Chính 👑" if role == "super" else "Admin Phụ 👤"
         await update.message.reply_text(
@@ -543,7 +516,7 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # ===== ĐANG CHỜ NHẬP (password/channel) =====
+    # Input đang chờ
     if uid in WAITING and isinstance(WAITING[uid], str):
         state = WAITING[uid]
 
@@ -615,9 +588,6 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("❓ Dùng menu 👇", reply_markup=main_menu(role))
 
 
-# ============================================
-# CALLBACK
-# ============================================
 async def callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
@@ -683,7 +653,7 @@ def health():
 
 
 # ============================================
-# BOT
+# BOT WEBHOOK
 # ============================================
 async def post_init(app: Application):
     await app.bot.set_my_commands([
@@ -748,6 +718,9 @@ def self_ping():
         time.sleep(14 * 60)
 
 
+# ============================================
+# MAIN
+# ============================================
 if __name__ == "__main__":
     threading.Thread(target=run_bot_webhook, daemon=True).start()
     threading.Thread(target=self_ping, daemon=True).start()
